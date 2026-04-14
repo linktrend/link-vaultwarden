@@ -98,7 +98,7 @@ diesel-derive-newtype = "2.1.2"
 libsqlite3-sys = { version = "0.36.0", features = ["bundled"], optional = true }
 
 # Crypto-related libraries
-rand = "0.10.0"
+rand = "0.10.1"
 ring = "0.17.14"
 subtle = "2.6.1"
 
