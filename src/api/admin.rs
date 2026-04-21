@@ -30,6 +30,7 @@ use crate::{
     error::{Error, MapResult},
     http_client::make_http_request,
     mail,
+    sso::FAKE_SSO_IDENTIFIER,
     util::{
         container_base_image, format_naive_datetime_local, get_active_web_release, get_display_size,
         is_running_in_container, parse_experimental_client_feature_flags, FeatureFlagFilter, NumberOrString,
@@ -315,7 +316,11 @@ async fn invite_user(data: Json<InviteData>, _token: AdminToken, conn: DbConn) -
 
     async fn _generate_invite(user: &User, conn: &DbConn) -> EmptyResult {
         if CONFIG.mail_enabled() {
-            let org_id: OrganizationId = FAKE_ADMIN_UUID.to_string().into();
+            let org_id: OrganizationId = if CONFIG.sso_enabled() {
+                FAKE_SSO_IDENTIFIER.into()
+            } else {
+                FAKE_ADMIN_UUID.into()
+            };
             let member_id: MembershipId = FAKE_ADMIN_UUID.to_string().into();
             mail::send_invite(user, org_id, member_id, &CONFIG.invitation_org_name(), None).await
         } else {
@@ -480,13 +485,14 @@ async fn deauth_user(user_id: UserId, _token: AdminToken, conn: DbConn, nt: Noti
 #[post("/users/<user_id>/disable", format = "application/json")]
 async fn disable_user(user_id: UserId, _token: AdminToken, conn: DbConn, nt: Notify<'_>) -> EmptyResult {
     let mut user = get_user_or_404(&user_id, &conn).await?;
-    Device::delete_all_by_user(&user.uuid, &conn).await?;
     user.reset_security_stamp(&conn).await?;
     user.enabled = false;
 
     let save_result = user.save(&conn).await;
 
     nt.send_logout(&user, None, &conn).await;
+
+    Device::delete_all_by_user(&user.uuid, &conn).await?;
 
     save_result
 }
@@ -517,7 +523,11 @@ async fn resend_user_invite(user_id: UserId, _token: AdminToken, conn: DbConn) -
         }
 
         if CONFIG.mail_enabled() {
-            let org_id: OrganizationId = FAKE_ADMIN_UUID.to_string().into();
+            let org_id: OrganizationId = if CONFIG.sso_enabled() {
+                FAKE_SSO_IDENTIFIER.into()
+            } else {
+                FAKE_ADMIN_UUID.into()
+            };
             let member_id: MembershipId = FAKE_ADMIN_UUID.to_string().into();
             mail::send_invite(&user, org_id, member_id, &CONFIG.invitation_org_name(), None).await
         } else {
